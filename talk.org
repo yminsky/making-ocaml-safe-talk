@@ -1,0 +1,182 @@
+#+TITLE: Making OCaml Safe for Performance Engineering
+
+* Making OCaml Safe for Performance Engineering
+
+* What is OCaml like?
+
+** Expressive static type system, w/type inference
+
+     #+BEGIN_SRC ocaml
+     let rec list_map l f =
+        match l with
+        | [] -> []
+        | first :: rest -> f first :: list_map rest f
+     #+END_SRC
+
+   will have its type inferred as:
+
+     #+BEGIN_SRC ocaml
+     val list_map : 'a list -> ('a -> 'b) -> 'b list
+     #+END_SRC
+
+** Simple, pervasive polymorphism
+
+   #+BEGIN_SRC ocaml
+   val list_map : 'a list -> ('a -> 'b) -> 'b list
+   #+END_SRC
+
+** Simple representation of OCaml *values*
+
+  - Either *immediate* or *block*
+
+  - *immediates* fit inside a machine word, minus tag bit
+    - Examples: int, char, bool
+
+  - *blocks* are heap-allocated values
+    - one header word
+    - one word per nested value
+    - Examples: string, array, record
+
+** Parallelism
+
+- Pre 5.0: no parallelism
+  - A single GIL (like Python)
+
+- 5.0 and beyond: Multicore GC
+  - with sane memory model
+  - but no reliable way to avoid races
+
+* What's not to love?
+
+** Minimal control over memory representation
+
+  - hard to keep data compact
+    - int32 has an overhead of 6x!
+  - pointer indirection defeats prefetcher
+  - heap allocation is inefficient
+
+** Unsafe parallelism is no fun
+
+  - It's incredibly error-prone
+  - and good memory models are expensive!
+
+* What do we want?
+
+  *Safe* and *convenient* control over performance-critical
+  aspects of program behavior, but *only where you need it*.
+
+  And...in OCaml! So the changes must be *conservative*.
+
+* What we're building
+
+Three major user-facing features:
+
+- Narrow and flat data layouts
+- Stack allocation
+- Parallel programming
+
+Built on two new type-system features:
+
+  *kinds* and *modes*
+
+* Narrow and flat data layout
+
+** Unboxed Types
+
+Have to escape OCaml's "value" representation!
+
+But this breaks polymorphism!
+
+  - Categorize types by their *layout*
+    - which is itself a kind
+  - polymorphism is limited by kind
+
+    # TODO: Add a code example or two.
+** What layouts are there?
+
+  - Regular values
+    - #value, #immediate
+
+  - Narrow atomic layouts
+    - #bit16, #bits8, #bits0, #float
+
+  - Nestable, structured types
+    - #{ foo: #bits8; bar: int list }
+
+** How are unboxed types used?
+
+- On their own, admit no heap representation
+- So, how to use them?
+  - can be passed to and returned from functions
+  - can be packed into heap-allocated values
+  - can be arranged in unboxed arrays
+  - can be mapped back-and-forth to boxed equivalents
+  - boxed equivalents can be mutated
+
+** Clawing polymorphism back
+
+- Lack of polymorphism is really a pain
+- But, don't need to write the code multiple times!
+- Can write once, instantiate once per kind
+
+* Stack allocation
+
+** Heap vs Stack allocation
+
+Heap allocation is expensive
+
+  - Major heap allocation is very expensive
+  - Even minor heap allocation is cache-inefficent
+
+Stack allocation is better!
+
+  - Similar to minor-heap allocation
+  - But values are collected faster, cheaper
+  - Touch fewer cache lines
+
+** Making stack allocation safe
+
+  - Follow a *stack discipline*
+  - Mainly:
+    - don't create pointers from heap to stack
+    - don't return stack values
+
+** Can't we Rust?
+
+Why not use Rust-style lifetimes?
+
+- Functions take (often implicit) *lifetime* parameter
+- Values under polymorphic lifetimes can be stack-allocated
+
+But,
+
+- You often trip in to higher-order polymorphism
+- Inference is undecidable!
+- Very un-ocaml, and arguably unergonomic
+
+** Instead, Modes!
+
+Modes are:
+
+- Properties that can be applied to any type
+- That by default apply deeply
+
+In this case, we add a pair of modes, *local* and *global*.
+
+- global is the default
+- local values must follow the stack discipline
+
+** Why modes?
+
+There are things you can do to any value, independent of
+type:
+
+- Make an alias
+- Return from a function
+- Create a pointer to it
+
+etc.
+
+These are all *deep*, meaning, if you do it to the top-level
+value, you do it all the way down.
+* Data-race freedom
