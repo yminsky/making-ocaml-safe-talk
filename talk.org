@@ -7,25 +7,25 @@
 ** Expressive static type system, w/type inference
 
      #+BEGIN_SRC ocaml
-     let rec list_map l f =
+     let rec map l f =
         match l with
         | [] -> []
-        | first :: rest -> f first :: list_map rest f
+        | first :: rest -> f first :: map rest f
      #+END_SRC
 
    will have its type inferred as:
 
      #+BEGIN_SRC ocaml
-     val list_map : 'a list -> ('a -> 'b) -> 'b list
+     val map : 'a list -> ('a -> 'b) -> 'b list
      #+END_SRC
 
 ** Simple, pervasive polymorphism
 
    #+BEGIN_SRC ocaml
-   val list_map : 'a list -> ('a -> 'b) -> 'b list
+   val map : 'a list -> ('a -> 'b) -> 'b list
    #+END_SRC
 
-** Simple representation of OCaml *values*
+** Simple representation of OCaml values
 
   - Either *immediate* or *block*
 
@@ -37,6 +37,7 @@
     - one word per nested value
     - Examples: string, array, record
 
+  - Polymorphism and separate compilation are built on this.
 ** Parallelism
 
 - Pre 5.0: no parallelism
@@ -51,19 +52,22 @@
 ** Minimal control over memory representation
 
   - hard to keep data compact
-    - int32 has an overhead of 6x!
+    - byte has an overhead of 8x
+    - even int64 has an overhead of 3x!
   - pointer indirection defeats prefetcher
   - heap allocation is inefficient
 
 ** Unsafe parallelism is no fun
 
-  - It's incredibly error-prone
+  - Even with a good memory model,
+    it's incredibly error-prone
   - and good memory models are expensive!
 
 * What do we want?
 
-  *Safe* and *convenient* control over performance-critical
-  aspects of program behavior, but *only where you need it*.
+  *Safe* and *convenient* control
+  over performance-critical aspects of program behavior,
+  but *only where you need it*.
 
   And...in OCaml! So the changes must be *conservative*.
 
@@ -161,22 +165,85 @@ Modes are:
 - Properties that can be applied to any type
 - That by default apply deeply
 
-In this case, we add a pair of modes, *local* and *global*.
+In this case, we add a pair of modes:
 
-- global is the default
-- local values must follow the stack discipline
+- *global* is the default, unconstrained
+- *local* values must follow the stack discipline
 
-** Why modes?
+There's sub-moding:
 
-There are things you can do to any value, independent of
-type:
+  - can pass a local where a global is expected
+
+** Example
+
+If type of List.map is:
+
+#+BEGIN_SRC ocaml
+val map : 'a list -> ('a -> 'b) -> 'b list
+        @ .       -> local      -> .
+#+END_SRC
+
+then this doesn't allocate:
+
+#+BEGIN_SRC ocaml
+let multiply_by l mult =
+  List.map l (fun x -> mult * x)
+#+END_SRC
+
+# TODO: Make sure this signature is correct!
+
+
+** Lots more to do!
+
+- Support mode-polymorphism
+- Integrate modes and kinds
+  - Who cares if your immediate is local?
+  - always(m) is a kind that tracks this
+
+** Smart constructors
+
+functions that can return local values, e.g.:
+
+    #+BEGIN_SRC ocaml
+    type pos = { x: float; y: float }
+    let create_pos x y = local { x; y }
+
+    val create_local_pos
+      : float -> float -> pos
+      @ local -> local -> local
+    #+END_SRC
+
+- Local-returning fxns don't create their own stack frame
+
+* Data-race freedom
+
+** Modes are a natural fit
+
+Things you can do to any value:
 
 - Make an alias
 - Return from a function
 - Create a pointer to it
+- Pass to another thread
 
-etc.
+These operations are all *deep*.
 
-These are all *deep*, meaning, if you do it to the top-level
-value, you do it all the way down.
-* Data-race freedom
+Modes are a natural match to control these!
+And just what we need for controlling parallelism
+
+** A bestiary of modes
+
+12 modes, in 5 dimensions.
+
+| dimension     |             |           |          |
+|---------------+-------------+-----------+----------|
+| Locality      | local       |           | _global_ |
+| Aliasing      | unique      | exclusive | _shared_ |
+| Linearity     | _many_      | separate  | once     |
+| Read/write    | _readwrite_ |           | readonly |
+| Parallel-safe | sync        |           | _unsync_ |
+
+** Examples
+
+- spawn
+- lock and key
