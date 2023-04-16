@@ -87,7 +87,24 @@ Built on two new type-system features:
 
 ** Unboxed Types
 
-Have to escape OCaml's "value" representation!
+Have to escape OCaml's "value" representation.
+
+A bunch of new types!
+
+- Unboxed primitives
+    #int32, #int8, #float
+- Unboxed records
+    #{ foo: #int32; bar: int list }
+
+How to work with these?
+
+- No don't heap representation
+- Can be passed and returned as extra arguments
+- Can be boxed, or placed in arrays
+
+# TODO: Add a code example or two.
+
+** What about polymorphism?
 
 But this breaks polymorphism!
 
@@ -95,17 +112,16 @@ But this breaks polymorphism!
     - which is itself a kind
   - polymorphism is limited by kind
 
-    # TODO: Add a code example or two.
 ** What layouts are there?
 
   - Regular values
-    - #value, #immediate
+    - value, immediate
 
   - Narrow atomic layouts
-    - #bit16, #bits8, #bits0, #float
+    - #bits32, #bits8, #void, #float
 
-  - Nestable, structured types
-    - #{ foo: #bits8; bar: int list }
+  - Aggregated layouts
+    - #bits32 * #bits8 * #float
 
 ** How are unboxed types used?
 
@@ -165,6 +181,8 @@ Modes are:
 - Properties that can be applied to any type
 - That by default apply deeply
 
+** Global and Local
+
 In this case, we add a pair of modes:
 
 - *global* is the default, unconstrained
@@ -174,7 +192,7 @@ There's sub-moding:
 
   - can pass a local where a global is expected
 
-** Example
+** Stack allocation
 
 If type of List.map is:
 
@@ -192,14 +210,6 @@ let multiply_by l mult =
 
 # TODO: Make sure this signature is correct!
 
-
-** Lots more to do!
-
-- Support mode-polymorphism
-- Integrate modes and kinds
-  - Who cares if your immediate is local?
-  - always(m) is a kind that tracks this
-
 ** Smart constructors
 
 functions that can return local values, e.g.:
@@ -213,7 +223,34 @@ functions that can return local values, e.g.:
       @ local -> local -> local
     #+END_SRC
 
-- Local-returning fxns don't create their own stack frame
+Local-returning fxns don't create their own stack frame
+
+** Resource allocation
+
+#+BEGIN_SRC ocaml
+val with_file
+  : string -> (In_channel.t -> 'a) -> 'a
+  @ .      -> (local        ->  .) ->  .
+#+END_SRC
+
+** Lots more to do!
+
+- Support mode-polymorphism
+
+   TODO: better example for mode polymorphism?
+
+   #+BEGIN_SRC ocaml
+   val map
+     : 'a list ->       ('a -> 'b) -> 'b list
+     @ 'm      -> local ('m -> 'n) -> 'n
+   #+END_SRC
+
+
+- Integrate modes and kinds
+  - Who cares if your immediate is local?
+  - always(m) is a kind that tracks this
+
+- Other applications of local, like typed effects!
 
 * Data-race freedom
 
@@ -231,19 +268,69 @@ These operations are all *deep*.
 Modes are a natural match to control these!
 And just what we need for controlling parallelism
 
+** A new mode dimension: thread-safety
+
+Values can be *sync* or *unsync*.
+
+- *sync* values can safely be accessed concurrently
+- *unsync* has no such guarantee
+
+So, what's sync?
+
+- All deeply immutable values are sync by default.
+- Synchronization primitives can be sync too
+
 ** A bestiary of modes
 
 12 modes, in 5 dimensions.
 
-| dimension     |             |           |          |
-|---------------+-------------+-----------+----------|
-| Locality      | local       |           | _global_ |
-| Aliasing      | unique      | exclusive | _shared_ |
-| Linearity     | _many_      | separate  | once     |
-| Read/write    | _readwrite_ |           | readonly |
-| Parallel-safe | sync        |           | _unsync_ |
+| dimension     |          |           |             |
+|---------------+----------+-----------+-------------|
+| Locality      | local    |           | *global*    |
+| Thread-safety | *unsync* |           | sync        |
+| Aliasing      | *shared* | exclusive | unique      |
+| Linearity     | once     | separate  | *many*      |
+| Readonly      | readonly |           | *readwrite* |
 
-** Examples
+** Spawning threads
 
-- spawn
-- lock and key
+- fxn run by thread must be sync
+- returned value doesn't have to be
+
+#+BEGIN_SRC ocaml
+val spawn
+  :      (unit -> 'a) -> 'a thread
+  @ sync (.    ->  .) ->  .
+
+val join
+  : 'a thread -> 'a
+  @ .         ->  .
+#+END_SRC
+
+** Communicating via channels
+
+Data sent between threads must by sync.
+
+#+BEGIN_SRC ocaml
+val send
+  : 'a channel -> 'a   -> unit
+  @ .          -> sync -> .
+
+val recv
+  : 'a channel -> 'a
+  @ .          -> sync
+#+END_SRC
+
+
+* State of the work
+
+- stack allocation is in production
+- Kinds are in progress
+- Data-race freedom is still being designed
+
+All available on github.
+
+* Challenges
+
+- Lots of internal iteration on design
+-
