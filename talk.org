@@ -2,6 +2,8 @@
 
 * Making OCaml Safe for Performance Engineering
 
+  A 50,000-foot view of changes Jane Street is working on
+  to make OCaml into a better language for performance engineering
 * What is OCaml like?
 
 ** Expressive static type system, w/type inference
@@ -13,63 +15,74 @@
         | first :: rest -> f first :: map rest f
      #+END_SRC
 
+   # pause
    will have its type inferred as:
 
      #+BEGIN_SRC ocaml
      val map : 'a list -> ('a -> 'b) -> 'b list
      #+END_SRC
 
-** Simple, pervasive polymorphism
+   # pause
+   Polymorphism is simple and pervasive!
 
-   #+BEGIN_SRC ocaml
-   val map : 'a list -> ('a -> 'b) -> 'b list
-   #+END_SRC
+** Uniform representation of values
 
-** Simple representation of OCaml values
+  Either *immediate* or *block*
 
-  - Either *immediate* or *block*
+  # pause
+  *immediates* fit inside a machine word, minus tag bit
+    Examples: int, char, bool
 
-  - *immediates* fit inside a machine word, minus tag bit
-    - Examples: int, char, bool
+  # pause
+  *blocks* are heap-allocated values
+    one header word
+    one word per nested value
+    Examples: string, array, record
 
-  - *blocks* are heap-allocated values
-    - one header word
-    - one word per nested value
-    - Examples: string, array, record
+  # pause
+  Important for GC and polymorphism!
+** Fast separate compilation
 
-  - Polymorphism and separate compilation are built on this.
+  - Importantly, compile once for all types
+  - Depends on uniform memory representation
+
 ** Parallelism
 
-- Pre 5.0: no parallelism
-  - A single GIL (like Python)
+# pause
+Pre 5.0: no parallelism
+  A global runtime lock (like Python)
 
-- 5.0 and beyond: Multicore GC
-  - with sane memory model
-  - but no reliable way to avoid races
+# pause
+5.0 and beyond: Multicore GC
+  with sane memory model
+  but no race-free programming model
 
-* What's not to love?
+* So, what's not to love?
 
 ** Minimal control over memory representation
 
   - hard to keep data compact
-    - byte has an overhead of 8x
-    - even int64 has an overhead of 3x!
+    - byte takes 8 bytes
+    - int64 (8 bytes) takes 24!
   - pointer indirection defeats prefetcher
-  - heap allocation is inefficient
-
+  - All non-trivial data must be exposed to GC
 ** Unsafe parallelism is no fun
 
   - Even with a good memory model,
     it's incredibly error-prone
   - and good memory models are expensive!
 
-* What do we want?
+* Design goals
 
-  *Safe* and *convenient* control
+  # pause
+  *Safe*, *convenient*, *predictable* control
   over performance-critical aspects of program behavior,
+  # pause
   but *only where you need it*.
 
-  And...in OCaml! So the changes must be *conservative*.
+  # pause
+  And...in OCaml!
+  So changes must be *backwards-compatible*.
 
 * What we're building
 
@@ -77,79 +90,71 @@ Three major user-facing features:
 
 - Narrow and flat data layouts
 - Stack allocation
-- Parallel programming
+- Race-free parallel programming
 
-Built on two new type-system features:
+All type-safe, built on two type-system features:
 
+# pause
   *kinds* and *modes*
 
 * Narrow and flat data layout
 
 ** Unboxed Types
 
-Have to escape OCaml's "value" representation.
+New types with different representations!
 
-A bunch of new types!
+# pause
+Unboxed primitives
+  #int32, #int8, #float
 
-- Unboxed primitives
-    #int32, #int8, #float
-- Unboxed records
-    #{ foo: #int32; bar: int list }
+# pause
+Can fit within ordinary types
+  { foo: #int8; bar: #int32 }
 
-How to work with these?
+# pause
+And unboxed records
+  #{ foo: #int8; bar: int list }
 
-- No don't heap representation
-- Can be passed and returned as extra arguments
-- Can be boxed, or placed in arrays
+# pause
+And unboxed arrays!
+   #{ foo: #int8; bar: #int32 } array
 
-# TODO: Add a code example or two.
+** What can you do with them?
+
+- Unboxed types have no heap representation, but:
+- can be passed to functions (as multiple args)
+- returned from functions (multi-argument return)
+- placed within heap-allocated values
+  - and then mutated
+
 
 ** What about polymorphism?
 
 But this breaks polymorphism!
 
-  - Categorize types by their *layout*
-    - which is itself a kind
-  - polymorphism is limited by kind
+- Categorize types by their *layout*
+  - which is a *kind*
+- allow polymorphism up to kind
 
 ** What layouts are there?
 
-  - Regular values
-    - value, immediate
+  - Regular values: value, immediate
+  - Atomic layouts: bits32, bits8, void, float
+  - Aggregated layouts: bits64 * bits64
 
-  - Narrow atomic layouts
-    - #bits32, #bits8, #void, #float
+# pause
+Note the need for sub-kinding!
 
-  - Aggregated layouts
-    - #bits32 * #bits8 * #float
-
-** How are unboxed types used?
-
-- On their own, admit no heap representation
-- So, how to use them?
-  - can be passed to and returned from functions
-  - can be packed into heap-allocated values
-  - can be arranged in unboxed arrays
-  - can be mapped back-and-forth to boxed equivalents
-  - boxed equivalents can be mutated
-
-** Clawing polymorphism back
-
-- Lack of polymorphism is really a pain
-- But, don't need to write the code multiple times!
-- Can write once, instantiate once per kind
 
 * Stack allocation
 
 ** Heap vs Stack allocation
 
-Heap allocation is expensive
+- Heap allocation is expensive
+  - Especially major heap allocation
+  - Minor is better, but still cache-inefficent
 
-  - Major heap allocation is very expensive
-  - Even minor heap allocation is cache-inefficent
-
-Stack allocation is better!
-
+- Stack allocation is better!
   - Similar to minor-heap allocation
   - But values are collected faster, cheaper
   - Touch fewer cache lines
@@ -163,67 +168,75 @@ Stack allocation is better!
 
 ** Can't we Rust?
 
-Why not use Rust-style lifetimes?
+- Why not use Rust-style lifetimes?
 
-- Functions take (often implicit) *lifetime* parameter
-- Values under polymorphic lifetimes can be stack-allocated
+  - Functions take (often implicit) *lifetime* parameter
+  - Values under polymorphic lifetimes can be stack-allocated
 
-But,
+- But,
 
-- You often trip in to higher-order polymorphism
-- Inference is undecidable!
-- Very un-ocaml, and arguably unergonomic
+  - You often trip in to higher-order polymorphism
+  - Inference is undecidable!
+  - Very un-ocaml, and arguably unergonomic
 
 ** Instead, Modes!
 
 Modes are:
 
-- Properties that can be applied to any type
-- That by default apply deeply
+  - Properties that can be applied to any type
+  - That by default apply deeply
 
 ** Global and Local
 
+# pause
 In this case, we add a pair of modes:
 
-- *global* is the default, unconstrained
-- *local* values must follow the stack discipline
+   *global* is the default, unconstrained
+   *local* values must follow the stack discipline
 
-There's sub-moding:
+# pause
+There's sub-moding!
 
-  - can pass a local where a global is expected
+  can pass a global where a local is expected
 
-** Stack allocation
+** An example of stack allocation
 
-If type of List.map is:
+#+BEGIN_SRC ocaml
+let map l f =
+  match l with
+  | [] -> []
+  | hd :: tl -> f hd :: map tl f
+#+END_SRC
 
+# pause
 #+BEGIN_SRC ocaml
 val map : 'a list -> ('a -> 'b) -> 'b list
         @ .       -> local      -> .
 #+END_SRC
 
-then this doesn't allocate:
-
+# pause
 #+BEGIN_SRC ocaml
 let multiply_by l mult =
-  List.map l (fun x -> mult * x)
+  map l (fun x -> mult * x)
 #+END_SRC
-
-# TODO: Make sure this signature is correct!
 
 ** Smart constructors
 
-functions that can return local values, e.g.:
+functions that can return local values if they
+don't create a stack frame.
 
+    # pause
     #+BEGIN_SRC ocaml
     type pos = { x: float; y: float }
-    let create_pos x y = local { x; y }
+    let create_pos x y = exclave { x; y }
+    #+END_SRC
 
+    # pause
+    #+BEGIN_SRC ocaml
     val create_local_pos
       : float -> float -> pos
       @ local -> local -> local
     #+END_SRC
-
-Local-returning fxns don't create their own stack frame
 
 ** Resource allocation
 
@@ -233,29 +246,40 @@ val with_file
   @ .      -> (local        ->  .) ->  .
 #+END_SRC
 
-** Lots more to do!
+** Mode polymorphism
 
-- Support mode-polymorphism
-
-   TODO: better example for mode polymorphism?
+   # pause
+Instead of this:
 
    #+BEGIN_SRC ocaml
-   val map
-     : 'a list ->       ('a -> 'b) -> 'b list
-     @ 'm      -> local ('m -> 'n) -> 'n
+   val hd
+     : 'a list -> 'a
+     @ .       ->  .
+
+   val hd_local
+     : 'a list -> 'a
+     @ local   -> local
+   #+END_SRC
+
+   # pause
+Write this:
+
+   #+BEGIN_SRC ocaml
+   val hd : 'a list -> 'a
+          @ 'm      -> 'm
    #+END_SRC
 
 
-- Integrate modes and kinds
-  - Who cares if your immediate is local?
-  - always(m) is a kind that tracks this
+** Modal kinds
 
-- Other applications of local, like typed effects!
+  - Who cares if your immediate is local?
+  - always(local) is a kind that tracks this
 
 * Data-race freedom
 
 ** Modes are a natural fit
 
+# pause
 Things you can do to any value:
 
 - Make an alias
@@ -265,20 +289,19 @@ Things you can do to any value:
 
 These operations are all *deep*.
 
-Modes are a natural match to control these!
-And just what we need for controlling parallelism
-
 ** A new mode dimension: thread-safety
 
+# pause
 Values can be *sync* or *unsync*.
 
-- *sync* values can safely be accessed concurrently
-- *unsync* has no such guarantee
+  *sync* values can safely be accessed concurrently
+  *unsync* has no such guarantee
 
+# pause
 So, what's sync?
 
-- All deeply immutable values are sync by default.
-- Synchronization primitives can be sync too
+  - All deeply immutable values are sync by default.
+  - Data protected under a synchronization primitive can be sync too
 
 ** A bestiary of modes
 
@@ -294,14 +317,17 @@ So, what's sync?
 
 ** Spawning threads
 
-- fxn run by thread must be sync
+- function run by thread must be sync
 - returned value doesn't have to be
 
 #+BEGIN_SRC ocaml
 val spawn
   :      (unit -> 'a) -> 'a thread
   @ sync (.    ->  .) ->  .
+#+END_SRC
 
+# pause
+#+BEGIN_SRC ocaml
 val join
   : 'a thread -> 'a
   @ .         ->  .
@@ -311,26 +337,36 @@ val join
 
 Data sent between threads must by sync.
 
+# pause
 #+BEGIN_SRC ocaml
 val send
   : 'a channel -> 'a   -> unit
   @ .          -> sync -> .
+#+END_SRC
 
+# pause
+#+BEGIN_SRC ocaml
 val recv
   : 'a channel -> 'a
   @ .          -> sync
 #+END_SRC
 
-
-* State of the work
+* How far are we?
 
 - stack allocation is in production
 - Kinds are in progress
 - Data-race freedom is still being designed
 
-All available on github.
+* So, how's it going?
 
-* Challenges
+- Fits into OCaml surprisingly well
+- And it makes awkward performance hacks nice!
+- Pay-as-you go seems to work
+- We're nervous about the complexity!
 
-- Lots of internal iteration on design
--
+* More info
+
+- Data-race freedom design doc:
+  [[https://github.com/ocaml-flambda/ocaml-jst/blob/main/jane/doc/proposals/data-race-freedom.md]]
+- Unboxed types RFC:
+  https://github.com/ocaml/RFCs/pull/34
