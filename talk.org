@@ -139,8 +139,8 @@ But this breaks polymorphism!
 ** What layouts are there?
 
   - Regular values: value, immediate
-  - Atomic layouts: bits32, bits8, void, float
-  - Aggregated layouts: bits64 * bits32 * bits8
+  - Atomic layouts: bits64, bits32, bits8, void, float
+  - Aggregated layouts: bits64 * bits32 * void * bits8
 
 # pause
 Note the need for sub-kinding!
@@ -233,7 +233,7 @@ don't create a stack frame.
 
     # pause
     #+BEGIN_SRC ocaml
-    val create_local_pos
+    val create_pos
       : float -> float -> pos
       @ local -> local -> local
     #+END_SRC
