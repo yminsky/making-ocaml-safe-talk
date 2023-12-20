@@ -1,5 +1,33 @@
 #+TITLE: Making OCaml Safe for Performance Engineering
 
+Abstract:
+
+    Over the last couple of years, Jane Street has greatly increased
+    its investment in OCaml, and has started developing major
+    extensions to the OCaml's type system, with the primary goal of
+    making OCaml a better language for writing high-performance
+    systems.
+
+    In this talk, I'll attempt to provide a developer's-eye view of
+    these changes.  We'll cover two major directions of innovation:
+    first, the addition of modal types to OCaml, which opens up a
+    variety of ambitious features, like memory-safe stack-allocation;
+    type-level tracking of effects, and data-race freedom guarantees
+    for multicore code.  The second is the addition of a kind system
+    to OCaml, which will provides more control over the representation
+    of memory, in particular allowing for structured data to be
+    represented in a cache-and-prefetch-friendly tabular form.
+    Together, these features pull together some of the most important
+    features for writing high performance code in Rust, while
+    maintaining the relative simplicity of programming in OCaml.
+
+    In all of this, I'll focus less on the type theory, and more on
+    how these features are surfaced to users, the practical problems
+    that they help us solve, and the place in the design space of
+    programming languages that this leaves us in.
+
+
+
 * Making OCaml Safe for Performance Engineering
 
   A 50,000-foot view of changes Jane Street is working on
@@ -116,7 +144,7 @@ And unboxed records
   #{ foo: int8#; bar: int list }
 
 # pause
-And unboxed arrays!
+And arrays of unboxed records
    #{ foo: int8#; bar: int32# } array
 
 ** What can you do with them?
@@ -220,7 +248,7 @@ let multiply_by l mult =
   map l (fun x -> mult * x)
 #+END_SRC
 
- ** Smart constructors
+** Smart constructors
 
 functions that can return local values if they
 don't create a stack frame.
@@ -305,15 +333,15 @@ So, what values are sync?
 
 ** A bestiary of modes
 
-12 modes, in 5 dimensions.
+14 modes, in 5 dimensions.
 
-| dimension     |          |           |             |
-|---------------+----------+-----------+-------------|
-| Locality      | local    |           | *global*    |
-| Thread-safety | *unsync* |           | sync        |
-| Aliasing      | *shared* | exclusive | unique      |
-| Linearity     | once     | separate  | *many*      |
-| Readonly      | readonly |           | *readwrite* |
+| dimension  |             |             |             |
+|------------+-------------+-------------+-------------|
+| Locality   | local       |             | *global*    |
+| Syncness   | *unsync*    | cooperative | sync        |
+| Aliasing   | *shared*    | exclusive   | unique      |
+| Linearity  | once        | separate    | *many*      |
+| Contention | *contended* | communal    | uncontended |
 
 ** Spawning threads
 
@@ -354,7 +382,8 @@ val recv
 * How far are we?
 
 - Stack allocation is in production
-- Unboxed types has started to land (float# is released)
+- Unboxed types has started to land (float# is released, arrays of
+  unboxed primitives is close)
 - Data-race freedom is still being designed
 
 * So, how's it going?
