@@ -259,7 +259,7 @@ let map l f =
 # pause
 #+BEGIN_SRC ocaml
 val map : 'a list -> ('a -> 'b) -> 'b list
-        @ .       -> local      -> .
+       @@ .       -> local      -> .
 #+END_SRC
 
 # pause
@@ -283,7 +283,7 @@ don't create a stack frame.
     #+BEGIN_SRC ocaml
     val create_pos
       : float -> float -> pos
-      @ local -> local -> local
+     @@ local -> local -> local
     #+END_SRC
 
 ** Resource allocation
@@ -291,7 +291,7 @@ don't create a stack frame.
 #+BEGIN_SRC ocaml
 val with_file
   : string -> (In_channel.t -> 'a) -> 'a
-  @ .      -> (local        ->  .) ->  .
+ @@ .      -> (local        ->  .) ->  .
 #+END_SRC
 
 ** Mode polymorphism
@@ -302,11 +302,11 @@ Instead of this:
    #+BEGIN_SRC ocaml
    val hd
      : 'a list -> 'a
-     @ .       ->  .
+    @@ .       ->  .
 
    val hd_local
      : 'a list -> 'a
-     @ local   -> local
+    @@ local   -> local
    #+END_SRC
 
    # pause
@@ -314,7 +314,7 @@ Write this:
 
    #+BEGIN_SRC ocaml
    val hd : 'a list -> 'a
-          @ 'm      -> 'm
+         @@ 'm      -> 'm
    #+END_SRC
 
 
@@ -371,14 +371,14 @@ So, what values are sync?
 #+BEGIN_SRC ocaml
 val spawn
   :      (unit -> 'a) -> 'a thread
-  @ sync (.    ->  .) ->  .
+ @@ sync (.    ->  .) ->  .
 #+END_SRC
 
 # pause
 #+BEGIN_SRC ocaml
 val join
   : 'a thread -> 'a
-  @ .         ->  .
+ @@ .         ->  .
 #+END_SRC
 
 ** Communicating via channels
@@ -389,22 +389,22 @@ Data sent between threads must by sync.
 #+BEGIN_SRC ocaml
 val send
   : 'a channel -> 'a   -> unit
-  @ .          -> sync -> .
+ @@ .          -> sync -> .
 #+END_SRC
 
 # pause
 #+BEGIN_SRC ocaml
 val recv
   : 'a channel -> 'a
-  @ .          -> sync
+ @@ .          -> sync
 #+END_SRC
 
 * How far are we?
 
 - Stack allocation is in production
-- Unboxed types has started to land (float# is released, arrays of
-  unboxed primitives is close)
-- Data-race freedom is still being designed
+- Unboxed types has started to land (float#, unboxed ints out)
+    arrays of unboxed primitives is close
+- Data-race freedom implementation underway
 
 * So, how's it going?
 
