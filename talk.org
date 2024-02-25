@@ -37,17 +37,17 @@ Abstract:
 ** Expressive static type system, w/type inference
 
      #+BEGIN_SRC ocaml
-     let rec map l f =
+     let rec map l ~f =
         match l with
         | [] -> []
-        | first :: rest -> f first :: map rest f
+        | first :: rest -> f first :: map rest ~f
      #+END_SRC
 
    # pause
    will have its type inferred as:
 
      #+BEGIN_SRC ocaml
-     val map : 'a list -> ('a -> 'b) -> 'b list
+     val map : 'a list -> f:('a -> 'b) -> 'b list
      #+END_SRC
 
    # pause
@@ -250,15 +250,15 @@ There's sub-moding!
 ** An example of stack allocation
 
 #+BEGIN_SRC ocaml
-let map l f =
+let rec map l ~f =
   match l with
   | [] -> []
-  | hd :: tl -> f hd :: map tl f
+  | hd :: tl -> f hd :: map tl ~f
 #+END_SRC
 
 # pause
 #+BEGIN_SRC ocaml
-val map : 'a list -> ('a -> 'b) -> 'b list
+val map : 'a list -> ~f:('a -> 'b) -> 'b list
        @@ .       -> local      -> .
 #+END_SRC
 
@@ -290,7 +290,7 @@ don't create a stack frame.
 
 #+BEGIN_SRC ocaml
 val with_file
-  : string -> (In_channel.t -> 'a) -> 'a
+  : string -> f:(In_channel.t -> 'a) -> 'a
  @@ .      -> (local        ->  .) ->  .
 #+END_SRC
 
