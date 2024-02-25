@@ -53,6 +53,18 @@ Abstract:
    # pause
    Polymorphism is simple and pervasive!
 
+** Implementing polymorphism
+
+  But how can we implement polymorphism in machine code?
+
+  - Example: ints and records have different sizes/shapes
+      How can one (machine) function manipulate both types?
+
+  - One possible solution: C++ generics
+      Compiler makes copies of each generic function
+
+  - OCaml has a different solution!
+
 ** Uniform representation of values
 
   Either *immediate* or *block*
@@ -68,7 +80,7 @@ Abstract:
     Examples: string, array, record
 
   # pause
-  Important for GC and polymorphism!
+  Also important for GC
 ** Fast separate compilation
 
   - Importantly, compile once for all types
