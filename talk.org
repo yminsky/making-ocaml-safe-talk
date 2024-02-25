@@ -178,13 +178,21 @@ But this breaks polymorphism!
 
 ** What layouts are there?
 
-  - Regular values: value, immediate
-  - Atomic layouts: bits64, bits32, bits8, void, float
+A lattice of atomic layouts:
+
+                    any
+                     |
+         -------------------------------
+        /      |       |        |   ... \
+     value   void   float64   bits8     bits64
+       |
+ non_null_value
+
+  - any: unknown layout, uses can't be compiled
+      Useful in signatures
+  - non_null_value: powers non-allocating options
+
   - Aggregated layouts: bits64 * bits32 * void * bits8
-
-# pause
-Note the need for sub-kinding!
-
 
 * Stack allocation
 
