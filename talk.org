@@ -385,22 +385,31 @@ val join
  @@ .         ->  .
 #+END_SRC
 
-** Communicating via channels
+** Manipulating pointers to shared memory
 
-Data sent between threads must by sync.
-
-# pause
 #+BEGIN_SRC ocaml
-val send
-  : 'a channel -> 'a   -> unit
- @@ .          -> sync -> .
-#+END_SRC
+module Ptr : sig
 
-# pause
-#+BEGIN_SRC ocaml
-val recv
-  : 'a channel -> 'a
- @@ .          -> sync
+  (* A pointer to shared memory holding an ['a], with "key" ['k]. *)
+  type ('a, 'k) t
+
+  (* Create a shared memory cell protected by key ['k] *)
+  val create : f:(unit -> 'b) -> ('b, 'k) t
+            @@ sync           -> .
+
+  (* Manipulate data in shared memory.
+     Keys are considered mutable data and can't be used when [contended].
+     This ensures data-race freedom. *)
+  val map :
+      'k Key.t -> f:('a -> 'b) -> ('a, 'k) t -> ('b, 'k) t
+   @@ .        -> sync         -> .          -> .
+
+  val extract :
+      'k Key.t -> f:('a -> 'b)     -> ('a, 'k) t -> 'b
+   @@ .        -> sync (. -> sync) -> .          -> contended
+
+  ...
+end
 #+END_SRC
 
 * How far are we?
