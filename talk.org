@@ -191,8 +191,11 @@ A lattice of atomic layouts:
   - any: unknown layout, uses can't be compiled
       Useful in signatures
   - non_null_value: powers non-allocating options
+      #+BEGIN_SRC ocaml
+      type ('a : non_null_value) or_null
+      #+END_SRC
 
-  - Aggregated layouts: bits64 * bits32 * void * bits8
+  - Aggregate layouts: bits64 * bits32 * void * bits8
 
 * Stack allocation
 
