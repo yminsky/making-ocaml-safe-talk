@@ -261,14 +261,14 @@ let rec map l ~f =
 
 # pause
 #+BEGIN_SRC ocaml
-val map : 'a list -> ~f:('a -> 'b) -> 'b list
-       @@ .       -> local      -> .
+val map : 'a list -> f:('a -> 'b) -> 'b list
+       @@ .       -> local        -> .
 #+END_SRC
 
 # pause
 #+BEGIN_SRC ocaml
 let multiply_by l mult =
-  map l (fun x -> mult * x)
+  map l ~f:(fun x -> mult * x)
 #+END_SRC
 
 ** Smart constructors
@@ -294,7 +294,7 @@ don't create a stack frame.
 #+BEGIN_SRC ocaml
 val with_file
   : string -> f:(In_channel.t -> 'a) -> 'a
- @@ .      -> (local        ->  .) ->  .
+ @@ .      -> (local          ->  .) ->  .
 #+END_SRC
 
 ** Mode polymorphism
