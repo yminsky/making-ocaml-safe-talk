@@ -57,13 +57,13 @@ Abstract:
 
   But how can we implement polymorphism in machine code?
 
-  - Example: ints and records have different sizes/shapes
-      How can one (machine) function manipulate both types?
+  - How can one (x86) function act on data with different sizes?
 
   - One possible solution: C++ generics
-      Compiler makes copies of each generic function
 
-  - OCaml has a different solution!
+  - Another: C# runtime code generation
+
+  - OCaml has a different approach!
 
 ** Uniform representation of values
 
