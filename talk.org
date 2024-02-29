@@ -362,13 +362,13 @@ Two varieties of modes:
 - *prescriptive*: What you can do with a value in the future
 - *descriptive*: What has happened to a value in the past
 
-| dimension  | variety   || min mode    |             | max mode    |
-|------------+-----------++-------------+-------------+-------------|
-| Locality   | prescribe || *global*    |             | local       |
-| Contention | describe  || uncontended | communal    | *contended* |
-| Syncness   | prescribe || sync        | cooperative | *unsync*    |
-| Aliasing   | describe  || unique      | exclusive   | *shared*    |
-| Linearity  | prescribe || *many*      | separate    | once        |
+| dimension  | variety   || min mode      |             | max mode  |
+|------------+-----------++---------------+-------------+-----------|
+| Locality   | prescribe || *global*      |             | local     |
+| Contention | describe  || *uncontended* | communal    | contended |
+| Syncness   | prescribe || sync          | cooperative | *unsync*  |
+| Aliasing   | describe  || unique        | exclusive   | *shared*  |
+| Linearity  | prescribe || *many*        | separate    | once      |
 
 ** Spawning threads
 
