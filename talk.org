@@ -53,6 +53,18 @@ Abstract:
    # pause
    Polymorphism is simple and pervasive!
 
+** Implementing polymorphism
+
+  But how can we implement polymorphism in machine code?
+
+  - How can one (x86) function act on data with different sizes?
+
+  - One possible solution: C++ generics
+
+  - Another: C# runtime code generation
+
+  - OCaml has a different approach!
+
 ** Uniform representation of values
 
   Either *immediate* or *block*
@@ -68,7 +80,7 @@ Abstract:
     Examples: string, array, record
 
   # pause
-  Important for GC and polymorphism!
+  Also important for GC
 ** Fast separate compilation
 
   - Importantly, compile once for all types
@@ -166,13 +178,24 @@ But this breaks polymorphism!
 
 ** What layouts are there?
 
-  - Regular values: value, immediate
-  - Atomic layouts: bits64, bits32, bits8, void, float
-  - Aggregated layouts: bits64 * bits32 * void * bits8
+A lattice of atomic layouts:
 
-# pause
-Note the need for sub-kinding!
+                    any
+                     |
+         -------------------------------
+        /      |       |        |   ... \
+     value   void   float64   bits8     bits64
+       |
+ non_null_value
 
+  - any: unknown layout, uses can't be compiled
+      Useful in signatures
+  - non_null_value: powers non-allocating options
+      #+BEGIN_SRC ocaml
+      type ('a : non_null_value) or_null
+      #+END_SRC
+
+  - Aggregate layouts: bits64 * bits32 * void * bits8
 
 * Stack allocation
 
@@ -230,7 +253,7 @@ There's sub-moding!
 ** An example of stack allocation
 
 #+BEGIN_SRC ocaml
-let map l f =
+let rec map l f =
   match l with
   | [] -> []
   | hd :: tl -> f hd :: map tl f
@@ -239,7 +262,7 @@ let map l f =
 # pause
 #+BEGIN_SRC ocaml
 val map : 'a list -> ('a -> 'b) -> 'b list
-        @ .       -> local      -> .
+       @@ .       -> local        -> .
 #+END_SRC
 
 # pause
@@ -263,7 +286,7 @@ don't create a stack frame.
     #+BEGIN_SRC ocaml
     val create_pos
       : float -> float -> pos
-      @ local -> local -> local
+     @@ local -> local -> local
     #+END_SRC
 
 ** Resource allocation
@@ -271,7 +294,7 @@ don't create a stack frame.
 #+BEGIN_SRC ocaml
 val with_file
   : string -> (In_channel.t -> 'a) -> 'a
-  @ .      -> (local        ->  .) ->  .
+ @@ .      -> (local        ->  .) ->  .
 #+END_SRC
 
 ** Mode polymorphism
@@ -282,11 +305,11 @@ Instead of this:
    #+BEGIN_SRC ocaml
    val hd
      : 'a list -> 'a
-     @ .       ->  .
+    @@ .       ->  .
 
    val hd_local
      : 'a list -> 'a
-     @ local   -> local
+    @@ local   -> local
    #+END_SRC
 
    # pause
@@ -294,7 +317,7 @@ Write this:
 
    #+BEGIN_SRC ocaml
    val hd : 'a list -> 'a
-          @ 'm      -> 'm
+         @@ 'm      -> 'm
    #+END_SRC
 
 
@@ -335,13 +358,17 @@ So, what values are sync?
 
 14 modes, in 5 dimensions.
 
-| dimension  |             |             |             |
-|------------+-------------+-------------+-------------|
-| Locality   | local       |             | *global*    |
-| Syncness   | *unsync*    | cooperative | sync        |
-| Aliasing   | *shared*    | exclusive   | unique      |
-| Linearity  | once        | separate    | *many*      |
-| Contention | *contended* | communal    | uncontended |
+Two varieties of modes:
+- *prescriptive*: What you can do with a value in the future
+- *descriptive*: What has happened to a value in the past
+
+| dimension  | variety   || min mode      |             | max mode  |
+|------------+-----------++---------------+-------------+-----------|
+| Locality   | prescribe || *global*      |             | local     |
+| Contention | describe  || *uncontended* | communal    | contended |
+| Syncness   | prescribe || sync          | cooperative | *unsync*  |
+| Aliasing   | describe  || unique        | exclusive   | *shared*  |
+| Linearity  | prescribe || *many*        | separate    | once      |
 
 ** Spawning threads
 
@@ -351,40 +378,49 @@ So, what values are sync?
 #+BEGIN_SRC ocaml
 val spawn
   :      (unit -> 'a) -> 'a thread
-  @ sync (.    ->  .) ->  .
+ @@ sync (.    ->  .) ->  .
 #+END_SRC
 
 # pause
 #+BEGIN_SRC ocaml
 val join
   : 'a thread -> 'a
-  @ .         ->  .
+ @@ .         ->  .
 #+END_SRC
 
-** Communicating via channels
+** Manipulating pointers to shared memory
 
-Data sent between threads must by sync.
-
-# pause
 #+BEGIN_SRC ocaml
-val send
-  : 'a channel -> 'a   -> unit
-  @ .          -> sync -> .
-#+END_SRC
+module Ptr : sig
 
-# pause
-#+BEGIN_SRC ocaml
-val recv
-  : 'a channel -> 'a
-  @ .          -> sync
+  (* A pointer to shared memory holding an ['a], with "key" ['k]. *)
+  type ('a, 'k) t
+
+  (* Create a shared memory cell protected by key ['k] *)
+  val create : (unit -> 'b) -> ('b, 'k) t
+            @@ sync         -> .
+
+  (* Manipulate data in shared memory.
+     Keys are considered mutable data and can't be used when [contended].
+     This ensures data-race freedom. *)
+  val map :
+      'k Key.t -> ('a -> 'b) -> ('a, 'k) t -> ('b, 'k) t
+   @@ .        -> sync       -> .          -> .
+
+  val extract :
+      'k Key.t -> ('a -> 'b)       -> ('a, 'k) t -> 'b
+   @@ .        -> sync (. -> sync) -> .          -> contended
+
+  ...
+end
 #+END_SRC
 
 * How far are we?
 
 - Stack allocation is in production
-- Unboxed types has started to land (float# is released, arrays of
-  unboxed primitives is close)
-- Data-race freedom is still being designed
+- Unboxed types has started to land (float#, unboxed ints out)
+    arrays of unboxed primitives is close
+- Data-race freedom implementation underway
 
 * So, how's it going?
 
