@@ -1,5 +1,4 @@
 #+TITLE: Making OCaml Safe for Performance Engineering
-
 Abstract:
 
     Over the last couple of years, Jane Street has greatly increased
@@ -182,6 +181,7 @@ A lattice of atomic layouts:
   - non_null_value: powers non-allocating options
       type ('a : non_null_value) or_null
   - Aggregate layouts: bits64 * bits32 * void * bits8
+
 * Stack allocation
 
 ** Heap vs Stack allocation
@@ -402,23 +402,36 @@ module Ptr : sig
 end
 #+END_SRC
 
-* How far are we?
+* COMMENT Results
+** How far are we?
 
 - Stack allocation is in production
 - Unboxed types has started to land (float#, unboxed ints out)
     arrays of unboxed primitives is close
 - Data-race freedom implementation underway
 
-* So, how's it going?
+** So, how's it going?
 
 - Fits into OCaml surprisingly well
 - And it makes awkward performance hacks nice!
 - Pay-as-you go seems to work
 - We're nervous about the complexity!
 
-* More info
+** Other references
 
-- Data-race freedom design doc:
-  [[https://github.com/ocaml-flambda/ocaml-jst/blob/main/jane/doc/proposals/data-race-freedom.md]]
-- Unboxed types RFC:
-  https://github.com/ocaml/RFCs/pull/34
+Video series: OCaml Unboxed
+
+  https://www.youtube.com/playlist?list=PLCiAikFFaMJrgFrWRKn0-1EI3gVZLQJtJ
+
+Modes / Stack allocation and data race freedom
+
+  Paper: https://antonlorenzen.de/mode-inference.pdf
+    (submitted to ICFP 2024)
+  Blog post: https://blog.janestreet.com/oxidizing-ocaml-parallelism/
+
+Unboxed types
+
+  RFC: https://github.com/ocaml/RFCs/pull/34
+  Talks:
+    https://www.janestreet.com/tech-talks/unboxed-types-for-ocaml/
+    https://www.youtube.com/watch?v=Vevld4cXSYk&ab_channel=ACMSIGPLAN
