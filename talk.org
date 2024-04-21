@@ -1,4 +1,3 @@
-
 #+TITLE: Making OCaml Safe for Performance Engineering
 
 Abstract:
@@ -33,6 +32,7 @@ Abstract:
 
   A 50,000-foot view of changes Jane Street is working on
   to make OCaml into a better language for performance engineering
+
 * What is OCaml like?
 
 ** Expressive static type system, w/type inference
@@ -54,18 +54,10 @@ Abstract:
    # pause
    Polymorphism is simple and pervasive!
 
-** Implementing polymorphism
-
-  But how can we implement polymorphism in machine code?
-
-  - How can one (x86) function act on data with different sizes?
-  - One possible solution: C++ generics
-  - Another: C# runtime code generation
-  - OCaml has a different approach!
-
 ** Uniform representation of values
 
-  Either *immediate* or *block*
+  # pause
+  Either *immediate* or pointer to a *block*
 
   # pause
   *immediates* fit inside a machine word, minus tag bit
@@ -78,12 +70,23 @@ Abstract:
     Examples: string, array, record
 
   # pause
-  Also important for GC
-** Fast separate compilation
+  Important for GC...
 
   # pause
-  And for fast separate compilation of
+  and for fast separate compilation of
   polymorphic functions
+
+** How can we implement polymorphism?
+
+  # pause
+  Compile each function just once,
+  rely on uniform memory representation!
+
+  # pause
+  There are other ways!
+
+  - C++: compile once per type
+  - C#: runtime code generation
 
 ** Parallelism
 
@@ -177,10 +180,7 @@ A lattice of atomic layouts:
   - any: unknown layout, uses can't be compiled
       Useful in signatures
   - non_null_value: powers non-allocating options
-      #+BEGIN_SRC ocaml
       type ('a : non_null_value) or_null
-      #+END_SRC
-
   - Aggregate layouts: bits64 * bits32 * void * bits8
 * Stack allocation
 
