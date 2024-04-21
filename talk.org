@@ -385,18 +385,18 @@ module Ptr : sig
 
   (* Create a shared memory cell protected by key ['k] *)
   val create : (unit -> 'b) -> ('b, 'k) t
-            @@ sync         -> .
+            @@ portable     -> .
 
   (* Manipulate data in shared memory.
      Keys are considered mutable data and can't be used when [contended].
      This ensures data-race freedom. *)
   val map :
       'k Key.t -> ('a -> 'b) -> ('a, 'k) t -> ('b, 'k) t
-   @@ .        -> sync       -> .          -> .
+   @@ .        -> portable   -> .          -> .
 
   val extract :
-      'k Key.t -> ('a -> 'b)       -> ('a, 'k) t -> 'b
-   @@ .        -> sync (. -> sync) -> .          -> contended
+      'k Key.t -> ('a -> 'b)               -> ('a, 'k) t -> 'b
+   @@ .        -> portable (. -> portable) -> .          -> contended
 
   ...
 end
