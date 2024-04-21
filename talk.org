@@ -1,3 +1,4 @@
+
 #+TITLE: Making OCaml Safe for Performance Engineering
 
 Abstract:
@@ -58,11 +59,8 @@ Abstract:
   But how can we implement polymorphism in machine code?
 
   - How can one (x86) function act on data with different sizes?
-
   - One possible solution: C++ generics
-
   - Another: C# runtime code generation
-
   - OCaml has a different approach!
 
 ** Uniform representation of values
@@ -83,19 +81,19 @@ Abstract:
   Also important for GC
 ** Fast separate compilation
 
-  - Importantly, compile once for all types
-  - Depends on uniform memory representation
+  # pause
+  And for fast separate compilation of
+  polymorphic functions
 
 ** Parallelism
 
 # pause
-Pre 5.0: no parallelism
-  A global runtime lock (like Python)
+Pre 5.0: no parallelism, global runtime lock
 
 # pause
 5.0 and beyond: Multicore GC
-  with sane memory model
-  but no race-free programming model
+  - with sane memory model
+  - but no race-free programming model
 
 * So, what's not to love?
 
@@ -108,8 +106,7 @@ Pre 5.0: no parallelism
   - All non-trivial data must be exposed to GC
 ** Unsafe parallelism is no fun
 
-  - Even with a good memory model,
-    it's incredibly error-prone
+  - Even with a good memory model, it's incredibly error-prone
   - and good memory models are expensive!
 
 * Design goals
@@ -159,24 +156,13 @@ And unboxed records
 And arrays of unboxed records
    #{ foo: int8#; bar: int32# } array
 
-** What can you do with them?
+** Layouts
 
-- Unboxed types have no heap representation, but:
-- can be passed to functions (as multiple args)
-- returned from functions (multi-argument return)
-- placed within heap-allocated values
-  - and then mutated
+Unboxed types are characterized by their *layout* (which is a
+particular form of *kind*).
 
-
-** What about polymorphism?
-
-But this breaks polymorphism!
-
-- Categorize types by their *layout*
-  - which is a *kind*
-- allow polymorphism up to kind
-
-** What layouts are there?
+# pause
+What layouts are there?
 
 A lattice of atomic layouts:
 
@@ -196,7 +182,6 @@ A lattice of atomic layouts:
       #+END_SRC
 
   - Aggregate layouts: bits64 * bits32 * void * bits8
-
 * Stack allocation
 
 ** Heap vs Stack allocation
@@ -262,7 +247,7 @@ let rec map l f =
 # pause
 #+BEGIN_SRC ocaml
 val map : 'a list -> ('a -> 'b) -> 'b list
-       @@ .       -> local        -> .
+       @@ .       -> local      -> .
 #+END_SRC
 
 # pause
@@ -340,45 +325,47 @@ Things you can do to any value:
 
 These operations are all *deep*.
 
-** A new mode dimension: thread-safety
+** A new mode dimension: portability
 
 # pause
-Values can be *sync* or *unsync*.
+Values can be *portable* or *unportable*.
 
-  *sync* values can safely be accessed concurrently
-  *unsync* has no such guarantee
+  *portable* values can safely be accessed concurrently
+  *unportable* has no such guarantee
 
 # pause
-So, what values are sync?
+So, what values are portable?
 
-  - All deeply immutable values are sync by default.
-  - Data protected under a synchronization primitive can be sync too
+  - All deeply immutable values are portable by default.
+  - Data protected under a synchronization primitive can be portable
+    too
 
 ** A bestiary of modes
 
-14 modes, in 5 dimensions.
+15 modes, in 5 dimensions.
 
 Two varieties of modes:
-- *prescriptive*: What you can do with a value in the future
-- *descriptive*: What has happened to a value in the past
 
-| dimension  | variety   || min mode      |             | max mode  |
-|------------+-----------++---------------+-------------+-----------|
-| Locality   | prescribe || *global*      |             | local     |
-| Contention | describe  || *uncontended* | communal    | contended |
-| Syncness   | prescribe || sync          | cooperative | *unsync*  |
-| Aliasing   | describe  || unique        | exclusive   | *shared*  |
-| Linearity  | prescribe || *many*        | separate    | once      |
+- *future* : What you can do with a value in the future
+- *past*   : What has happened to a value in the past
+
+| dimension   | variety | min mode      |           | max mode      |
+|-------------+---------+---------------+-----------+---------------|
+| Locality    | future  | *global*      | regional  | local         |
+| Uniqueness  | past    | unique        | exclusive | *aliased*     |
+| Linearity   | future  | *many*        | separate  | once          |
+| Contention  | past    | *uncontended* | shared    | contended     |
+| Portability | future  | portable      | observing | *nonportable* |
 
 ** Spawning threads
 
-- function run by thread must be sync
+- function run by thread must be portable
 - returned value doesn't have to be
 
 #+BEGIN_SRC ocaml
 val spawn
-  :      (unit -> 'a) -> 'a thread
- @@ sync (.    ->  .) ->  .
+  :          (unit -> 'a) -> 'a thread
+ @@ portable (.    ->  .) ->  .
 #+END_SRC
 
 # pause
