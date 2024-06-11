@@ -340,7 +340,7 @@ contended value.
 Portability tracks whether a value *is safe to share between threads*
 
 # pause
-Values can be *portable* or *unportable*.
+Values can be *portable* or *nonportable*.
 
   *portable* values can be shared between threads
   *unportable* values cannot
@@ -407,7 +407,7 @@ module Ptr : sig
 
   val extract :
       'k Key.t -> ('a -> 'b)               -> ('a, 'k) t -> 'b
-   @@ .        -> portable (. -> portable) -> .          -> contended
+   @@ .        -> (. -> portable) portable -> .          -> contended
 
   ...
 end
