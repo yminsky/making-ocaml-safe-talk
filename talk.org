@@ -170,17 +170,13 @@ A lattice of atomic layouts:
 
                     any
                      |
-         -------------------------------
-        /      |       |        |   ... \
-     value   void   float64   bits8     bits64
-       |
- non_null_value
+         ---------------------------------
+        /      |       |        |    ...  \
+     value   bits8   bits64  float64     void
 
   - any: unknown layout, uses can't be compiled
       Useful in signatures
-  - non_null_value: powers non-allocating options
-      type ('a : non_null_value) or_null
-  - Aggregate layouts: bits64 * bits32 * void * bits8
+  - Aggregate layouts: bits64 & bits32 & void & bits8
 
 * Stack allocation
 
@@ -309,7 +305,7 @@ Write this:
 ** Modal kinds
 
   - Who cares if your immediate is local?
-  - always(local) is a kind that tracks this
+  - "value mod global" is a kind that tracks this
 
 * Data-race freedom
 
@@ -325,20 +321,35 @@ Things you can do to any value:
 
 These operations are all *deep*.
 
+** A new mode dimension: contention
+
+Contention tracks whether a value *has been shared across threads*
+
+# pause
+Values can be *contended* or *uncontended*.
+
+  *uncontended* values have not been shared
+  *contended* have been
+
+# pause
+You are not allowed to read or write the mutable fields of a
+contended value.
+
 ** A new mode dimension: portability
+
+Portability tracks whether a value *is safe to share between threads*
 
 # pause
 Values can be *portable* or *unportable*.
 
-  *portable* values can safely be accessed concurrently
-  *unportable* has no such guarantee
+  *portable* values can be shared between threads
+  *unportable* values cannot
 
 # pause
 So, what values are portable?
 
-  - All deeply immutable values are portable by default.
-  - Data protected under a synchronization primitive can be portable
-    too
+  - Almost everything!
+  - Only functions that close over *uncontended* state are not.
 
 ** A bestiary of modes
 
@@ -426,7 +437,7 @@ Video series: OCaml Unboxed
 Modes / Stack allocation and data race freedom
 
   Paper: https://antonlorenzen.de/mode-inference.pdf
-    (submitted to ICFP 2024)
+    (accepted in ICFP 2024)
   Blog post: https://blog.janestreet.com/oxidizing-ocaml-parallelism/
 
 Unboxed types
