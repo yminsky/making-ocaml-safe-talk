@@ -12,20 +12,6 @@ options:
     - latex
 ---
 
-Abstract
---------
-
-Over the last few years, Jane Street has started developing major extensions of OCaml's type system, with the primary goal of making OCaml a better language for writing high-performance systems.
-
-This talk will provide a developer's-eye view of these changes. While giving a sketch of the overall direction, we'll focus specifically on the use of **modes** to provide lightweight control over how memory is used, to enable features like stack allocation and data-race free parallelism.
-
-In all of this, I'll focus less on the type theory, and more on how these features are surfaced to users, the practical problems that they help us solve, and the place in the design space of programming languages that this leaves us in.
-
-Making OCaml Safe for Performance Engineering
----------------------------------------------
-
-A 50,000-foot view of changes Jane Street is working on to make OCaml into a better language for performance engineering
-
 What is OCaml like?
 -------------------
 
@@ -63,17 +49,12 @@ Either *immediate* or pointer to a *block*
 
 <!-- pause -->
 
-*immediates* fit inside a machine word, minus tag bit
-- Examples: int, char, bool
-
-<!-- pause -->
-
-*blocks* are heap-allocated values
-- one header word
-- one word per nested value
-- Examples: string, array, record
-
-<!-- pause -->
+- *immediates* fit inside a machine word, minus tag bit
+  - Examples: int, char, bool
+- *blocks* are heap-allocated values
+  - one header word
+  - one word per nested value
+  - Examples: string, array, record
 
 Important for GC...
 
@@ -86,6 +67,8 @@ What is OCaml like?
 
 ## How can we implement polymorphism?
 
+<!-- pause -->
+
 Compile each function just once, rely on uniform memory representation!
 
 <!-- pause -->
@@ -97,15 +80,10 @@ There are other ways!
 
 ## Parallelism
 
-<!-- pause -->
-
-Pre 5.0: no parallelism, global runtime lock
-
-<!-- pause -->
-
-5.0 and beyond: Multicore GC
-- with sane memory model
-- but no race-free programming model
+- Pre 5.0: no parallelism, global runtime lock
+- 5.0 and beyond: Multicore GC
+  - with sane memory model
+  - but no race-free programming model
 
 So, what's not to love?
 -----------------------
@@ -128,7 +106,8 @@ Design goals
 
 <!-- pause -->
 
-**Safe**, **convenient**, **predictable** control over performance-critical aspects of program behavior,
+**Safe**, **convenient**, **predictable** control over
+performance-critical aspects of program behavior,
 
 <!-- pause -->
 
