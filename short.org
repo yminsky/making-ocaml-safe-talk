@@ -41,9 +41,6 @@ Abstract:
      val map : 'a list -> ('a -> 'b) -> 'b list
      #+END_SRC
 
-   # pause
-   Polymorphism is simple and pervasive!
-
 ** Uniform representation of values
 
   # pause
@@ -59,25 +56,6 @@ Abstract:
     one word per nested value
     Examples: string, array, record
 
-  # pause
-  Important for GC...
-
-  # pause
-  and for fast separate compilation of
-  polymorphic functions
-
-** How can we implement polymorphism?
-
-  # pause
-  Compile each function just once,
-  rely on uniform memory representation!
-
-  # pause
-  There are other ways!
-
-  - C++: compile once per type
-  - C#: runtime code generation
-
 ** Parallelism
 
 # pause
@@ -90,13 +68,11 @@ Pre 5.0: no parallelism, global runtime lock
 
 * So, what's not to love?
 
-** Minimal control over memory representation
+** Garbage collection can be a drag
 
-  - hard to keep data compact
-    - byte takes 8 bytes
-    - int64 (8 bytes) takes 24!
-  - pointer indirection defeats prefetcher
-  - All non-trivial data must be exposed to GC
+- All complex, structured data is heap-allocated.
+- GC is slow and non-deterministic
+
 ** Unsafe parallelism is no fun
 
   - Even with a good memory model, it's incredibly error-prone
@@ -112,7 +88,11 @@ Pre 5.0: no parallelism, global runtime lock
 
   # pause
   And...in OCaml!
-  So changes must be *backwards-compatible*.
+  # pause
+  So changes must be *backwards-compatible*,
+  # pause
+  and should *feel like OCaml*
+
 
 * What we're building
 
