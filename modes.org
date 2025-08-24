@@ -276,28 +276,34 @@ val join
 ** Manipulating pointers to shared memory
 
 #+BEGIN_SRC ocaml
-module Ptr : sig
+(* A pointer to shared memory holding an ['a], with "key" ['k]. *)
+type 'k key
+type ('a, 'k) ptr
+#+END_SRC
 
-  (* A pointer to shared memory holding an ['a], with "key" ['k]. *)
-  type ('a, 'k) t
+# pause
+#+BEGIN_SRC ocaml
+(* Create a shared memory cell protected by key ['k] *)
+val create : (unit -> 'b) -> ('b, 'k) ptr
+          @@ portable     -> .
+#+END_SRC
 
-  (* Create a shared memory cell protected by key ['k] *)
-  val create : (unit -> 'b) -> ('b, 'k) t
-            @@ portable     -> .
+# pause
+#+BEGIN_SRC ocaml
+(* Manipulate data in shared memory.
+   Keys are considered mutable data and can't be used when [contended].
+   This ensures data-race freedom. *)
+val map :
+    'k key -> ('a -> 'b) -> ('a, 'k) ptr -> ('b, 'k) ptr
+ @@ .      -> portable   -> .            -> .
+#+END_SRC
 
-  (* Manipulate data in shared memory.
-     Keys are considered mutable data and can't be used when [contended].
-     This ensures data-race freedom. *)
-  val map :
-      'k Key.t -> ('a -> 'b) -> ('a, 'k) t -> ('b, 'k) t
-   @@ .        -> portable   -> .          -> .
+# pause
+#+BEGIN_SRC ocaml
+val extract :
+    'k key -> ('a -> 'b)               -> ('a, 'k) ptr -> 'b
+ @@ .        -> (. -> portable) portable -> .            -> contended
 
-  val extract :
-      'k Key.t -> ('a -> 'b)               -> ('a, 'k) t -> 'b
-   @@ .        -> (. -> portable) portable -> .          -> contended
-
-  ...
-end
 #+END_SRC
 
 * Results
