@@ -93,61 +93,14 @@ Pre 5.0: no parallelism, global runtime lock
   # pause
   and should *feel like OCaml*
 
+* Better living through modes
 
-* What we're building
+Use a new *mode system* for controlling how memory is used.
 
-Three major user-facing features:
+Two major user-facing applications:
 
-- Narrow and flat data layouts
 - Stack allocation
 - Race-free parallel programming
-
-All type-safe, built on two type-system features:
-
-# pause
-  *kinds* and *modes*
-
-* Narrow and flat data layout
-
-** Unboxed Types
-
-New types with different representations!
-
-# pause
-Unboxed primitives
-  int32#, int8#, float#
-
-# pause
-Can fit within ordinary types
-  { foo: int8#; bar: int32# }
-
-# pause
-And unboxed records
-  #{ foo: int8#; bar: int list }
-
-# pause
-And arrays of unboxed records
-   #{ foo: int8#; bar: int32# } array
-
-** Layouts
-
-Unboxed types are characterized by their *layout* (which is a
-particular form of *kind*).
-
-# pause
-What layouts are there?
-
-A lattice of atomic layouts:
-
-                    any
-                     |
-         ---------------------------------
-        /      |       |        |    ...  \
-     value   bits8   bits64  float64     void
-
-  - any: unknown layout, uses can't be compiled
-      Useful in signatures
-  - Aggregate layouts: bits64 & bits32 & void & bits8
 
 * Stack allocation
 
@@ -240,43 +193,6 @@ don't create a stack frame.
       : float -> float -> pos
      @@ local -> local -> local
     #+END_SRC
-
-** Resource allocation
-
-#+BEGIN_SRC ocaml
-val with_file
-  : string -> (In_channel.t -> 'a) -> 'a
- @@ .      -> (local        ->  .) ->  .
-#+END_SRC
-
-** Mode polymorphism
-
-   # pause
-Instead of this:
-
-   #+BEGIN_SRC ocaml
-   val hd
-     : 'a list -> 'a
-    @@ .       ->  .
-
-   val hd_local
-     : 'a list -> 'a
-    @@ local   -> local
-   #+END_SRC
-
-   # pause
-Write this:
-
-   #+BEGIN_SRC ocaml
-   val hd : 'a list -> 'a
-         @@ 'm      -> 'm
-   #+END_SRC
-
-
-** Modal kinds
-
-  - Who cares if your immediate is local?
-  - "value mod global" is a kind that tracks this
 
 * Data-race freedom
 
@@ -384,13 +300,11 @@ module Ptr : sig
 end
 #+END_SRC
 
-* COMMENT Results
+* Results
 ** How far are we?
 
-- Stack allocation is in production
-- Unboxed types has started to land (float#, unboxed ints out)
-    arrays of unboxed primitives is close
-- Data-race freedom implementation underway
+- Stack allocation is in production for years!
+- Data-race freedom is starting to hit production
 
 ** So, how's it going?
 
@@ -399,21 +313,7 @@ end
 - Pay-as-you go seems to work
 - We're nervous about the complexity!
 
-** Other references
 
-Video series: OCaml Unboxed
+[[./image.png][OxCaml!]]
 
-  https://www.youtube.com/playlist?list=PLCiAikFFaMJrgFrWRKn0-1EI3gVZLQJtJ
-
-Modes / Stack allocation and data race freedom
-
-  Paper: https://antonlorenzen.de/mode-inference.pdf
-    (accepted in ICFP 2024)
-  Blog post: https://blog.janestreet.com/oxidizing-ocaml-parallelism/
-
-Unboxed types
-
-  RFC: https://github.com/ocaml/RFCs/pull/34
-  Talks:
-    https://www.janestreet.com/tech-talks/unboxed-types-for-ocaml/
-    https://www.youtube.com/watch?v=Vevld4cXSYk&ab_channel=ACMSIGPLAN
+[[./img/oxcaml.png]]
