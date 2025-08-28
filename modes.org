@@ -25,8 +25,10 @@ Abstract:
 
 * What is OCaml like?
 
-** Expressive static type system, w/type inference
+# pause
+*Expressive static type system, w/type inference*
 
+  # pause
      #+BEGIN_SRC ocaml
      let rec map l f =
         match l with
@@ -41,22 +43,9 @@ Abstract:
      val map : 'a list -> ('a -> 'b) -> 'b list
      #+END_SRC
 
-** Uniform representation of values
+* What is OCaml like?
 
-  # pause
-  Either *immediate* or pointer to a *block*
-
-  # pause
-  *immediates* fit inside a machine word, minus tag bit
-    Examples: int, char, bool
-
-  # pause
-  *blocks* are heap-allocated values
-    one header word
-    one word per nested value
-    Examples: string, array, record
-
-** Parallelism
+*Parallelism*
 
 # pause
 Pre 5.0: no parallelism, global runtime lock
@@ -71,7 +60,7 @@ Pre 5.0: no parallelism, global runtime lock
 ** Garbage collection can be a drag
 
 - All complex, structured data is heap-allocated.
-- GC is slow and non-deterministic
+- GC is non-deterministic and is bad for cache-locality
 
 ** Unsafe parallelism is no fun
 
@@ -95,9 +84,11 @@ Pre 5.0: no parallelism, global runtime lock
 
 * Better living through modes
 
+# pause
 Use a new *mode system* for controlling how memory is used.
 
-Two major user-facing applications:
+# pause
+Two motivating use-cases:
 
 - Stack allocation
 - Race-free parallel programming
@@ -117,10 +108,10 @@ Two major user-facing applications:
 
 ** Making stack allocation safe
 
-  - Follow a *stack discipline*
-  - Mainly:
+  - Follow a *stack discipline*!
     - don't create pointers from heap to stack
     - don't return stack values
+  - But how do we enforce that?
 
 ** Can't we Rust?
 
@@ -157,6 +148,7 @@ There's sub-moding!
 
 ** An example of stack allocation
 
+# pause
 #+BEGIN_SRC ocaml
 let rec map l f =
   match l with
@@ -166,8 +158,7 @@ let rec map l f =
 
 # pause
 #+BEGIN_SRC ocaml
-val map : 'a list -> ('a -> 'b) -> 'b list
-       @@ .       -> local      -> .
+val map : 'a list -> ('a -> 'b) @ local -> 'b list
 #+END_SRC
 
 # pause
@@ -178,8 +169,13 @@ let multiply_by l mult =
 
 ** Smart constructors
 
-functions that can return local values if they
-don't create a stack frame.
+How do we have functions that construct local values
+if we can't return a local?
+
+# pause
+Use =exclave=:
+   Close the current stack frame
+   so you can allocate on the parent frame
 
     # pause
     #+BEGIN_SRC ocaml
@@ -190,8 +186,7 @@ don't create a stack frame.
     # pause
     #+BEGIN_SRC ocaml
     val create_pos
-      : float -> float -> pos
-     @@ local -> local -> local
+      : float @ local -> float @ local -> pos @ local
     #+END_SRC
 
 * Data-race freedom
@@ -208,29 +203,50 @@ Things you can do to any value:
 
 These operations are all *deep*.
 
-** A new mode dimension: contention
+** A bestiary of modes
 
+# pause
+15 modes, in 6 dimensions.
+
+Two varieties of modes:
+
+- *future* : What you can do with a value in the future
+- *past*   : What has happened to a value in the past
+
+| dimension    | variety | min mode      |           | max mode      |
+|--------------+---------+---------------+-----------+---------------|
+| Locality     | future  | *global*      | regional  | local         |
+| Uniqueness   | past    | unique        | exclusive | *aliased*     |
+| Linearity    | future  | *many*        |           | once          |
+| Contention   | past    | *uncontended* | shared    | contended     |
+| Portability  | future  | portable      |           | *nonportable* |
+| Yielding     | future  | *unyielding*  |           | yielding      |
+
+** Contention
+
+# pause
 Contention tracks whether a value *has been shared across threads*
 
 # pause
 Values can be *contended* or *uncontended*.
 
-  *uncontended* values have not been shared
+  *uncontended* values have not been shared (the default)
   *contended* have been
 
 # pause
 You are not allowed to read or write the mutable fields of a
 contended value.
 
-** A new mode dimension: portability
+** Portability
 
+# pause
 Portability tracks whether a value *is safe to share between threads*
 
 # pause
 Values can be *portable* or *nonportable*.
 
   *portable* values can be shared between threads
-  *unportable* values cannot
+  *unportable* values cannot (the default)
 
 # pause
 So, what values are portable?
@@ -238,88 +254,69 @@ So, what values are portable?
   - Almost everything!
   - Only functions that close over *uncontended* state are not.
 
-** A bestiary of modes
-
-15 modes, in 5 dimensions.
-
-Two varieties of modes:
-
-- *future* : What you can do with a value in the future
-- *past*   : What has happened to a value in the past
-
-| dimension   | variety | min mode      |           | max mode      |
-|-------------+---------+---------------+-----------+---------------|
-| Locality    | future  | *global*      | regional  | local         |
-| Uniqueness  | past    | unique        | exclusive | *aliased*     |
-| Linearity   | future  | *many*        | separate  | once          |
-| Contention  | past    | *uncontended* | shared    | contended     |
-| Portability | future  | portable      | observing | *nonportable* |
-
 ** Spawning threads
 
 - function run by thread must be portable
 - returned value doesn't have to be
 
 #+BEGIN_SRC ocaml
-val spawn
-  :          (unit -> 'a) -> 'a thread
- @@ portable (.    ->  .) ->  .
+val spawn : (unit -> 'a) @ portable -> 'a thread
 #+END_SRC
 
 # pause
 #+BEGIN_SRC ocaml
-val join
-  : 'a thread -> 'a
- @@ .         ->  .
+val join : 'a thread -> 'a
 #+END_SRC
 
-** Manipulating pointers to shared memory
+** Safely sharing mutable memory
 
+# pause
 #+BEGIN_SRC ocaml
-(* A pointer to shared memory holding an ['a], with "key" ['k]. *)
-type 'k key
+(** A access for capsule 'k *)
+type 'k access
+(** A pointer holding an ['a], under the capsule ['k]. *)
 type ('a, 'k) ptr
 #+END_SRC
 
 # pause
 #+BEGIN_SRC ocaml
-(* Create a shared memory cell protected by key ['k] *)
-val create : (unit -> 'b) -> ('b, 'k) ptr
-          @@ portable     -> .
+(** Create a shared memory cell protected by capsule ['k] *)
+val create : (unit -> 'b) @ portable -> ('b, 'k) ptr
 #+END_SRC
 
 # pause
 #+BEGIN_SRC ocaml
-(* Manipulate data in shared memory.
-   Keys are considered mutable data and can't be used when [contended].
-   This ensures data-race freedom. *)
-val map :
-    'k key -> ('a -> 'b) -> ('a, 'k) ptr -> ('b, 'k) ptr
- @@ .      -> portable   -> .            -> .
+(** Manipulate data in shared memory.
+    An [access] is considered mutable data and can't be used when [contended].
+    This ensures data-race freedom. *)
+val map
+  : 'k access
+  -> ('a -> 'b) @ portable
+  -> ('a, 'k) ptr
+  -> ('b, 'k) ptr
 #+END_SRC
 
 # pause
 #+BEGIN_SRC ocaml
-val extract :
-    'k key -> ('a -> 'b)               -> ('a, 'k) ptr -> 'b
- @@ .        -> (. -> portable) portable -> .            -> contended
-
+val extract
+  :  'k access
+  -> ('a -> 'b @ portable) @ portable
+  -> ('a, 'k) ptr
+  -> 'b @ contended
 #+END_SRC
 
-* Results
-** How far are we?
+* How's it going
 
-- Stack allocation is in production for years!
-- Data-race freedom is starting to hit production
+- Modes in general fit into OCaml surprisingly well
 
-** So, how's it going?
+- Stack allocation
+  - Now a few years in
+  - Eliminates lots of awkward performance hacks
+  - Unlocks new idioms (resource mgmt, lightweight effect types)
+  - Pay-as-you-go works as advertised
 
-- Fits into OCaml surprisingly well
-- And it makes awkward performance hacks nice!
-- Pay-as-you go seems to work
-- We're nervous about the complexity!
-
-
-[[./image.png][OxCaml!]]
-
-[[./img/oxcaml.png]]
+- Data-race freedom
+  - Brand new!
+  - Despite the complexity, usable and fun
+  - And does a good job of surfacing data races!
+  - But not /as/ pay-as-you-go as we'd like
