@@ -1,0 +1,322 @@
+#+TITLE: Making OCaml Safe for Performance Engineering
+# 30m version of the talk
+
+Abstract:
+
+    Over the last few years, Jane Street has started developing major
+    extensions of OCaml's type system, with the primary goal of making
+    OCaml a better language for writing high-performance systems.
+
+    This talk will provide a developer's-eye view of these changes.
+    While giving a sketch of the overall direction, we'll focus
+    specifically on the use of **modes** to provide lightweight
+    control over how memory is used, to enable features like stack
+    allocation and data-race free parallelism.
+
+    In all of this, I'll focus less on the type theory, and more on
+    how these features are surfaced to users, the practical problems
+    that they help us solve, and the place in the design space of
+    programming languages that this leaves us in.
+
+* Making OCaml Safe for Performance Engineering
+
+  A 50,000-foot view of changes Jane Street is working on
+  to make OCaml into a better language for performance engineering
+
+* What is OCaml like?
+
+# pause
+*Expressive static type system, w/type inference*
+
+  # pause
+     #+BEGIN_SRC ocaml
+     let rec map l f =
+        match l with
+        | [] -> []
+        | first :: rest -> f first :: map rest f
+     #+END_SRC
+
+   # pause
+   will have its type inferred as:
+
+     #+BEGIN_SRC ocaml
+     val map : 'a list -> ('a -> 'b) -> 'b list
+     #+END_SRC
+
+* What is OCaml like?
+
+*Parallelism*
+
+# pause
+Pre 5.0: no parallelism, global runtime lock
+
+# pause
+5.0 and beyond: Multicore GC
+  - with sane memory model
+  - but no race-free programming model
+
+* So, what's not to love?
+
+** Garbage collection can be a drag
+
+- All complex, structured data is heap-allocated.
+- GC is non-deterministic and is bad for cache-locality
+
+** Unsafe parallelism is no fun
+
+  - Even with a good memory model, it's incredibly error-prone
+  - and good memory models are expensive!
+
+* Design goals
+
+  # pause
+  *Safe*, *convenient*, *predictable* control
+  over performance-critical aspects of program behavior,
+  # pause
+  but *only where you need it*.
+
+  # pause
+  And...in OCaml!
+  # pause
+  So changes must be *backwards-compatible*,
+  # pause
+  and should *feel like OCaml*
+
+* Better living through modes
+
+# pause
+Use a new *mode system* for controlling how memory is used.
+
+# pause
+Two motivating use-cases:
+
+- Stack allocation
+- Race-free parallel programming
+
+* Stack allocation
+
+** Heap vs Stack allocation
+
+- Heap allocation is expensive
+  - Especially major heap allocation
+  - Minor is better, but still cache-inefficent
+
+- Stack allocation is better!
+  - Similar to minor-heap allocation
+  - But values are collected faster, cheaper
+  - Touch fewer cache lines
+
+** Making stack allocation safe
+
+  - Follow a *stack discipline*!
+    - don't create pointers from heap to stack
+    - don't return stack values
+  - But how do we enforce that?
+
+** Can't we Rust?
+
+- Why not use Rust-style lifetimes?
+
+  - Functions take (often implicit) *lifetime* parameter
+  - Values under polymorphic lifetimes can be stack-allocated
+
+- But,
+
+  - You often trip in to higher-order polymorphism
+  - Inference is undecidable!
+  - Very un-ocaml, and arguably unergonomic
+
+** Instead, Modes!
+
+Modes are:
+
+  - Properties that can be applied to any type
+  - That by default apply deeply
+
+** Global and Local
+
+# pause
+In this case, we add a pair of modes:
+
+   *global* is the default, unconstrained
+   *local* values must follow the stack discipline
+
+# pause
+There's sub-moding!
+
+  can pass a global where a local is expected
+
+** An example of stack allocation
+
+# pause
+#+BEGIN_SRC ocaml
+let rec map l f =
+  match l with
+  | [] -> []
+  | hd :: tl -> f hd :: map tl f
+#+END_SRC
+
+# pause
+#+BEGIN_SRC ocaml
+val map : 'a list -> ('a -> 'b) @ local -> 'b list
+#+END_SRC
+
+# pause
+#+BEGIN_SRC ocaml
+let multiply_by l mult =
+  map l (fun x -> mult * x)
+#+END_SRC
+
+** Smart constructors
+
+How do we have functions that construct local values
+if we can't return a local?
+
+# pause
+Use =exclave=:
+   Close the current stack frame
+   so you can allocate on the parent frame
+
+    # pause
+    #+BEGIN_SRC ocaml
+    type pos = { x: float; y: float }
+    let create_pos x y = exclave { x; y }
+    #+END_SRC
+
+    # pause
+    #+BEGIN_SRC ocaml
+    val create_pos
+      : float @ local -> float @ local -> pos @ local
+    #+END_SRC
+
+* Data-race freedom
+
+** Modes are a natural fit
+
+# pause
+Things you can do to any value:
+
+- Make an alias
+- Return from a function
+- Create a pointer to it
+- Pass to another thread
+
+These operations are all *deep*.
+
+** A bestiary of modes
+
+# pause
+15 modes, in 6 dimensions.
+
+Two varieties of modes:
+
+- *future* : What you can do with a value in the future
+- *past*   : What has happened to a value in the past
+
+| dimension    | variety | min mode      |           | max mode      |
+|--------------+---------+---------------+-----------+---------------|
+| Locality     | future  | *global*      | regional  | local         |
+| Uniqueness   | past    | unique        | exclusive | *aliased*     |
+| Linearity    | future  | *many*        |           | once          |
+| Contention   | past    | *uncontended* | shared    | contended     |
+| Portability  | future  | portable      |           | *nonportable* |
+| Yielding     | future  | *unyielding*  |           | yielding      |
+
+** Contention
+
+# pause
+Contention tracks whether a value *has been shared across threads*
+
+# pause
+Values can be *contended* or *uncontended*.
+
+  *uncontended* values have not been shared (the default)
+  *contended* have been
+
+# pause
+You are not allowed to read or write the mutable fields of a
+contended value.
+
+** Portability
+
+# pause
+Portability tracks whether a value *is safe to share between threads*
+
+# pause
+Values can be *portable* or *nonportable*.
+
+  *portable* values can be shared between threads
+  *unportable* values cannot (the default)
+
+# pause
+So, what values are portable?
+
+  - Almost everything!
+  - Only functions that close over *uncontended* state are not.
+
+** Spawning threads
+
+- function run by thread must be portable
+- returned value doesn't have to be
+
+#+BEGIN_SRC ocaml
+val spawn : (unit -> 'a) @ portable -> 'a thread
+#+END_SRC
+
+# pause
+#+BEGIN_SRC ocaml
+val join : 'a thread -> 'a
+#+END_SRC
+
+** Safely sharing mutable memory
+
+# pause
+#+BEGIN_SRC ocaml
+(** A access for capsule 'k *)
+type 'k access
+(** A pointer holding an ['a], under the capsule ['k]. *)
+type ('a, 'k) ptr
+#+END_SRC
+
+# pause
+#+BEGIN_SRC ocaml
+(** Create a shared memory cell protected by capsule ['k] *)
+val create : (unit -> 'b) @ portable -> ('b, 'k) ptr
+#+END_SRC
+
+# pause
+#+BEGIN_SRC ocaml
+(** Manipulate data in shared memory.
+    An [access] is considered mutable data and can't be used when [contended].
+    This ensures data-race freedom. *)
+val map
+  : 'k access
+  -> ('a -> 'b) @ portable
+  -> ('a, 'k) ptr
+  -> ('b, 'k) ptr
+#+END_SRC
+
+# pause
+#+BEGIN_SRC ocaml
+val extract
+  :  'k access
+  -> ('a -> 'b @ portable) @ portable
+  -> ('a, 'k) ptr
+  -> 'b @ contended
+#+END_SRC
+
+* How's it going
+
+- Modes in general fit into OCaml surprisingly well
+
+- Stack allocation
+  - Now a few years in
+  - Eliminates lots of awkward performance hacks
+  - Unlocks new idioms (resource mgmt, lightweight effect types)
+  - Pay-as-you-go works as advertised
+
+- Data-race freedom
+  - Brand new!
+  - Despite the complexity, usable and fun
+  - And does a good job of surfacing data races!
+  - But not /as/ pay-as-you-go as we'd like
